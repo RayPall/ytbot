@@ -17,7 +17,7 @@ if st.button("Run Make scenario"):
     else:
         video_id = video_input.strip()
 
-    make_webhook_url = "https://hook.integromat.com/abcd1234xyz"  # your webhook URL
+    make_webhook_url = "https://hook.eu2.make.com/9jk9doqnef2cubutr9tqn1uprylnf162"  # your webhook URL
     payload = {"video_id": video_id}
     try:
         r = requests.post(make_webhook_url, json=payload)
