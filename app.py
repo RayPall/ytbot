@@ -51,4 +51,4 @@ if st.button("Fetch via proxy and send to Make"):
         elif "youtu.be/" in raw:
             video_id = raw.split("youtu.be/")[1].split("?")[0]
         else:
-            st.error("Couldn’t parse the URL. Paste
+            st.error("Couldn’t parse the URL. Paste")
