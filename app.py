@@ -1,8 +1,18 @@
 import streamlit as st
 from pytube import YouTube
-import os
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 st.title("YouTube Subtitle Extractor")
+
+def clean_youtube_url(url):
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    # Only keep the video id parameter
+    if "v" in query:
+        cleaned_query = urlencode({"v": query["v"][0]})
+        cleaned_parsed = parsed._replace(query=cleaned_query)
+        return urlunparse(cleaned_parsed)
+    return url
 
 yt_url = st.text_input("Enter YouTube Video Link:")
 
@@ -13,7 +23,8 @@ if st.button("Download"):
         st.error("Invalid URL. Please enter a valid YouTube link.")
     else:
         try:
-            yt = YouTube(yt_url)
+            cleaned_url = clean_youtube_url(yt_url)
+            yt = YouTube(cleaned_url)
             caption = yt.captions.get_by_language_code('en')
             if not caption:
                 st.error("No English auto-generated subtitles found.")
