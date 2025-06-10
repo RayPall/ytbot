@@ -1,112 +1,64 @@
 import streamlit as st
-import requests
-import types
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api.formatters import SRTFormatter
+import yt_dlp
+import os
 
-st.set_page_config(page_title="YouTube → SRT via Webshare")
-st.title("Fetch Auto-CC via Webshare and Send to Make")
-
-# ─── STEP 1: Webshare credentials ───
-# Replace the following four values with your Webshare “Endpoints” row exactly:
-proxy_ip   = "207.244.217.165"
-proxy_port = 6712
-proxy_user = "qjmegaso"
-proxy_pass = "4bscke4bszee"
-
-# Build a single proxy URL string:
-proxy_url = f"http://{proxy_user}:{proxy_pass}@{proxy_ip}:{proxy_port}"
-proxies = {
-    "http":  proxy_url,
-    "https": proxy_url
-}
-st.write("Debug: proxies dictionary = ", proxies)  # *** DEBUG ***
-
-# ─── STEP 2: Your Make webhook (replace with your actual webhook URL) ───
-MAKE_WEBHOOK_URL = "https://hook.eu2.make.com/9jk9doqnef2cubutr9tqn1uprylnf162"
-st.write("Debug: Make webhook URL = ", MAKE_WEBHOOK_URL)  # *** DEBUG ***
-
-video_input = st.text_input(
-    "Enter a YouTube video URL or just the ID:",
-    placeholder="e.g. dQw4w9WgXcQ"
-)
-
-# ─── STEP 3: When the button is pressed ───
-if st.button("Fetch via proxy and send to Make"):
-    st.write("✅ Button was pressed!")               # *** DEBUG ***
-    st.write("Video input is:", video_input)         # *** DEBUG ***
-
-    # 3.1) Extract video_id
-    raw = video_input.strip()
-    if raw.lower().startswith("http"):
-        # If it’s a full URL, parse out the v= param or youtu.be/
-        if "v=" in raw:
-            video_id = raw.split("v=")[1].split("&")[0]
-        elif "youtu.be/" in raw:
-            video_id = raw.split("youtu.be/")[1].split("?")[0]
-        else:
-            st.error("Couldn’t parse the URL. Paste the watch?v= link or just the ID.")
-            st.stop()
-    else:
-        video_id = raw
-    st.write("Debug: Parsed video_id =", video_id)   # *** DEBUG ***
-
-    # 3.2) Fetch transcript via proxy
-    try:
-        st.write("Debug: about to call get_transcript() via proxy...")  # *** DEBUG ***
-        transcript_list = YouTubeTranscriptApi.get_transcript(
-            video_id,
-            languages=["en", "cs"],
-            proxies=proxies
-        )
-        st.write("Debug: get_transcript returned", transcript_list[:2], "...")  # *** DEBUG ***
-    except Exception as e:
-        st.error(f"Could not fetch transcript via proxy:\n{e}")
-        st.stop()
-
-    # 3.3) If empty list, bail
-    if not transcript_list:
-        st.error("No transcript was found for this video (empty list).")
-        st.stop()
-
-    # 3.4) Convert dicts → objects
-    formatted_items = []
-    for chunk in transcript_list:
-        st.write("Debug: chunk =", chunk)          # *** DEBUG ***
-        item = types.SimpleNamespace(
-            text=chunk["text"],
-            start=chunk["start"],
-            duration=chunk["duration"]
-        )
-        formatted_items.append(item)
-    st.write("Debug: formatted_items[0] =", formatted_items[0])  # *** DEBUG ***
-
-    # 3.5) Format into SRT
-    formatter = SRTFormatter()
-    try:
-        srt_text = formatter.format_transcript(formatted_items)
-        st.write("Debug: srt_text[:200] =", srt_text[:200])  # *** DEBUG ***
-    except Exception as e:
-        st.error(f"Error formatting transcript into SRT:\n{e}")
-        st.write("DEBUG transcript_list:", transcript_list)
-        st.stop()
-
-    # 3.6) Show a preview
-    st.success("Transcript fetched and formatted (via Webshare proxy)! Preview:")
-    st.text_area("SRT Preview", value=srt_text[:500] + "\n…", height=300)
-
-    # 3.7) POST to Make
-    payload = {
-        "video_id": video_id,
-        "srt_contents": srt_text
+def download_captions(video_url):
+    ydl_opts = {
+        'writesubtitles': True,
+        'writeautomaticsub': True,
+        'subtitleslangs': ['en'],
+        'skip_download': True,
     }
-    st.write("Debug: About to POST to Make with payload keys:", payload.keys())  # *** DEBUG ***
-    try:
-        resp = requests.post(MAKE_WEBHOOK_URL, json=payload)
-        st.write("Debug: Make responded with status", resp.status_code)         # *** DEBUG ***
-        if resp.status_code == 200:
-            st.success("✅ Sent to Make successfully!")
+    
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(video_url, download=True)
+            video_title = info['title']
+            return video_title
+        except Exception as e:
+            st.error(f"Error downloading captions: {str(e)}")
+            return None
+
+def main():
+    st.title("YouTube Caption Extractor")
+    
+    # Input for YouTube URL
+    video_url = st.text_input("Enter YouTube Video URL:")
+    
+    if st.button("Extract Captions"):
+        if video_url:
+            with st.spinner("Extracting captions..."):
+                video_title = download_captions(video_url)
+                
+                if video_title:
+                    # Find the downloaded subtitle file
+                    subtitle_file = None
+                    for file in os.listdir():
+                        if file.endswith('.vtt'):
+                            subtitle_file = file
+                            break
+                    
+                    if subtitle_file:
+                        # Read and clean the subtitle file
+                        with open(subtitle_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        
+                        # Save to a text file
+                        output_file = f"{video_title}_captions.txt"
+                        with open(output_file, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        
+                        # Clean up the VTT file
+                        os.remove(subtitle_file)
+                        
+                        st.success(f"Captions extracted and saved to {output_file}")
+                        
+                        # Display the content
+                        st.text_area("Extracted Captions:", content, height=300)
+                    else:
+                        st.error("No captions found for this video")
         else:
-            st.error(f"Make webhook returned HTTP {resp.status_code}: {resp.text}")
-    except Exception as e:
-        st.error(f"Failed to POST to Make webhook: {e}")
+            st.warning("Please enter a YouTube URL")
+
+if __name__ == "__main__":
+    main()
