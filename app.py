@@ -9,6 +9,8 @@ yt_url = st.text_input("Enter YouTube Video Link:")
 if st.button("Download"):
     if not yt_url:
         st.error("Please enter a YouTube URL.")
+    elif not (yt_url.startswith("https://") or yt_url.startswith("http://")):
+        st.error("Invalid URL. Please enter a valid YouTube link.")
     else:
         try:
             yt = YouTube(yt_url)
