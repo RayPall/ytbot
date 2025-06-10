@@ -1,42 +1,26 @@
-import os
-from flask import Flask, request, render_template_string, send_file
+import streamlit as st
 from pytube import YouTube
 
-app = Flask(__name__)
+st.title("YouTube Subtitle Extractor")
+st.header("Enter YouTube Video Link")
 
-HTML_FORM = """
-<!doctype html>
-<title>YouTube Subtitle Extractor</title>
-<h2>Enter YouTube Video Link</h2>
-<form method=post>
-    <input type=text name=yt_url style="width:400px">
-    <input type=submit value=Download>
-</form>
-{% if error %}
-    <p style="color:red;">{{ error }}</p>
-{% endif %}
-"""
+yt_url = st.text_input("YouTube URL")
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-        if request.method == 'POST':
-                yt_url = request.form.get('yt_url', '').strip()
-                if not yt_url:
-                        return render_template_string(HTML_FORM, error="Please enter a YouTube URL.")
-                try:
-                        yt = YouTube(yt_url)
-                        caption = yt.captions.get_by_language_code('en')
-                        if not caption:
-                                return render_template_string(HTML_FORM, error="No English auto-generated subtitles found.")
-                        srt_captions = caption.generate_srt_captions()
-                        filename = "subtitles.txt"
-                        with open(filename, "w", encoding="utf-8") as f:
-                                f.write(srt_captions)
-                        return send_file(filename, as_attachment=True)
-                except Exception as e:
-                        return render_template_string(HTML_FORM, error=f"Error: {str(e)}")
-        return render_template_string(HTML_FORM)
-
-if __name__ == '__main__':
-        app.run(debug=True)
-        
+if st.button("Download"):
+    if not yt_url:
+        st.error("Please enter a YouTube URL.")
+    else:
+        try:
+            yt = YouTube(yt_url)
+            caption = yt.captions.get_by_language_code('en')
+            if not caption:
+                st.error("No English auto-generated subtitles found.")
+            else:
+                srt_captions = caption.generate_srt_captions()
+                filename = "subtitles.txt"
+                with open(filename, "w", encoding="utf-8") as f:
+                    f.write(srt_captions)
+                with open(filename, "rb") as f:
+                    st.download_button("Download Subtitles", f, filename=filename)
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
