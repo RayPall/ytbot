@@ -1,10 +1,10 @@
 import streamlit as st
 from pytube import YouTube
+import os
 
 st.title("YouTube Subtitle Extractor")
-st.header("Enter YouTube Video Link")
 
-yt_url = st.text_input("YouTube URL")
+yt_url = st.text_input("Enter YouTube Video Link:")
 
 if st.button("Download"):
     if not yt_url:
@@ -21,6 +21,6 @@ if st.button("Download"):
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(srt_captions)
                 with open(filename, "rb") as f:
-                    st.download_button("Download Subtitles", f, filename=filename)
+                    st.download_button("Download Subtitles", f, file_name=filename, mime="text/plain")
         except Exception as e:
             st.error(f"Error: {str(e)}")
